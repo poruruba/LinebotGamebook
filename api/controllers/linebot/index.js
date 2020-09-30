@@ -9,8 +9,8 @@ const mm = require('music-metadata');
 const HELPER_BASE = process.env.HELPER_BASE || '../../helpers/';
 
 const config = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN, // LINEのチャネルアクセストークン(長期)
-  channelSecret: process.env.LINE_CHANNEL_SECRET, // LINEのチャネルシークレット
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
 const LineUtils = require(HELPER_BASE + 'line-utils');
 const app = new LineUtils(line, config);
@@ -37,10 +37,16 @@ AWS.config.update({
   region: "ap-northeast-1",
 });
 const docClient = new AWS.DynamoDB.DocumentClient({
-  // 必要に応じて
+  // dynamodb_local用
+  endpoint: 'http://qnap.myhome.or.jp:32768',
 });
 var s3  = new AWS.S3({
-  // 必要に応じて
+  // minio用
+  accessKeyId: 'admin' ,
+  secretAccessKey: 'yujjiba00',
+  endpoint: 'http://compact.myhome.or.jp:9000',
+  s3ForcePathStyle: true, // needed with minio?
+  signatureVersion: 'v4'
 });
 
 async function load_scenario(name){
@@ -301,8 +307,8 @@ app.message(async (event, client) =>{
       throw "scenario not found";
 
     // 現在のシーンを取得
-    var scene = scenario.scene.filter(item => item.id == status.scene );
-    if( scene.length <= 0 )
+    var scene = scenario.scene.find(item => item.id == status.scene );
+    if( !scene )
       throw "scene not found";
 
     if( event.message.text == '持ち物' || event.message.text == 'もちもの'){
@@ -343,48 +349,52 @@ app.message(async (event, client) =>{
     }
 
     // 獲得アイテムの処理
-    if(scene[0].acquire ){
-      scene[0].acquire.forEach( item => {
-        var acquire = add_item(status.items, item);
-        var message = {
-          type: "text",
-          text: acquire ? (item + "を手に入れた") : ("すでに" + item + "を持っている")
-        }
-        messages.push(message);
-      });
+    if(scene.acquire && scene.acquire.length > 0){
+      scene.acquire.forEach(item => add_item(status.items, item));
+      var message = {
+        type: "text",
+        text: scene.acquire.join('、') + "を手に入れた"
+      }
+      messages.push(message);
     }
 
     // ロストアイテムの処理
-    if( scene[0].lost ){
-      scene[0].lost.forEach( item =>{
-        var lost = remove_item(status.items, item);
-        if( lost ){
-          var message = {
-            type: "text",
-            text: item + "を失った"
-          }
-          messages.push(message);
-        }
-      });
+    if( scene.lost && scene.lost.length > 0){
+      scene.lost.forEach(item => remove_item(status.items, item));
+      var message = {
+        type: "text",
+        text: scene.lost.join('、') + "を失った"
+      };
+      messages.push(message);
     }
 
     // メインダイアログ
-    var template = {
-      type: "template",
-      altText: scene[0].text,
-      template: {
-        type: "buttons",
-        text: scene[0].text,
-        actions: []
+    var flex = {
+      type: "flex",
+      altText: scene.text,
+      contents: {
+        type: "bubble",
+        size: "kilo",
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [],
+        },
+        footer:{
+          type: "box",
+          layout: "vertical",
+          contents:[],
+          flex: 0
+        }
       }
-    }
+    };
 
-    if( scene[0].image ){
+    if( scene.image ){
       // 画像が指定されていた場合
-      var image_url = IMAGE_URL_BASE + scene[0].image.background;
+      var image_url = IMAGE_URL_BASE + scene.image.background;
       // 画像合成が指定されていた場合
-      if(scene[0].image.composite ){
-        scene[0].image.composite.forEach( select => {
+      if(scene.image.composite ){
+        scene.image.composite.forEach( select => {
           // アイテムの所持・非所持確認
           var condition = check_condition(status.items, select.have, select.nothave );
           if( !condition )
@@ -396,18 +406,37 @@ app.message(async (event, client) =>{
             image_url += '_' + select.position;
         });
       }
-      template.template.thumbnailImageUrl = image_url;
-      template.template.imageSize = 'contain';
+      flex.contents.hero = {
+        type: "image",
+        url: encodeURI(image_url),
+        size: "full",
+        aspectRatio: "20:13",
+        aspectMode: "fit"
+      };
     }
 
-    if( scene[0].title ){
+    if( scene.title ){
       // タイトルが指定されていた場合
-      template.template.title = scene[0].title;
+      flex.contents.body.contents.push({
+        type: "text",
+        wrap: true,
+        text: scene.title,
+        weight: "bold",
+        size: "md"
+      });
     }
+
+    // テキストの設定
+    flex.contents.body.contents.push({
+      type: "text",
+      wrap: true,
+      size: "sm",
+      text: scene.text
+    });
 
     // 次の選択肢
-    if( scene[0].selection){
-      scene[0].selection.forEach( select =>{
+    if( scene.selection){
+      scene.selection.forEach( select =>{
         // アイテムの所持・非所持確認
         var condition = check_condition(status.items, select.have, select.nothave );
         if( !condition )
@@ -418,37 +447,52 @@ app.message(async (event, client) =>{
         if( select.type )
           type = select.type;
 
-        template.template.actions.push({
+        flex.contents.footer.contents.push({
+          type: "button",
+          style: "link",
+          height: "sm",
+          action:{
+            type: "message",
+            label: select.title + '(' + select.id + ')',
+            text: type + " " + select.id + " " + (status.turn + 1)
+          }
+        })
+      });
+    }
+    if( flex.contents.footer.contents.length == 0 ){
+      flex.contents.footer.contents.push({
+        type: "button",
+        style: "link",
+        height: "sm",
+        action:{
           type: "message",
-          label: select.title + '(' + select.id + ')',
-          text: type + " " + select.id + " " + (status.turn + 1),
-        });
+          label: "シナリオの最初に戻る",
+          text: "リセット"
+        }
+      });
+      flex.contents.footer.contents.push({
+        type: "button",
+        style: "link",
+        height: "sm",
+        action:{
+          type: "message",
+          label: "最初から始める",
+          text: "リタイア"
+        }
       });
     }
-    if( template.template.actions.length == 0 ){
-      template.template.actions.push({
-        type: "message",
-        label: "シナリオの最初に戻る",
-        text: "リセット",
-      });
-      template.template.actions.push({
-        type: "message",
-        label: "最初から始める",
-        text: "リタイア",
-      });
-    }
-    messages.push(template);
+    messages.push(flex);
 
-    if( scene[0].audio ){
+    if( scene.audio ){
       // 音声ファイルが指定されていた場合
       // アイテムの所持・非所持確認
-      var condition = check_condition(status.items, scene[0].audio.have, scene[0].audio.nothave );
+      var condition = check_condition(status.items, scene.audio.have, scene.audio.nothave );
       if( condition ){
-        var audio_buffer = await load_audio(scene[0].audio.name);
+        var audio_buffer = await load_audio(scene.audio.name);
         var metadata = await mm.parseBuffer(audio_buffer, "audio/aac")
         var message = {
           type: "audio",
-          originalContentUrl: encodeURI(AUDIO_URL_BASE + scene[0].audio.name + '.m4a'),
+          originalContentUrl: encodeURI(AUDIO_URL_BASE + scene.audio.name + '.m4a'),
           duration: Math.floor(metadata.format.duration * 1000) 
         };
         messages.push(message);
