@@ -14,12 +14,6 @@ AWS.config.update({
   region: "ap-northeast-1",
 });
 var s3  = new AWS.S3({
-  // minio用
-  accessKeyId: 'admin' ,
-  secretAccessKey: 'yujjiba00',
-  endpoint: 'http://compact.myhome.or.jp:9000',
-  s3ForcePathStyle: true, // needed with minio?
-  signatureVersion: 'v4'
 });
 
 // ファイル用
