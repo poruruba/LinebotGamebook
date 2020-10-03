@@ -37,16 +37,8 @@ AWS.config.update({
   region: "ap-northeast-1",
 });
 const docClient = new AWS.DynamoDB.DocumentClient({
-  // dynamodb_local用
-  endpoint: 'http://qnap.myhome.or.jp:32768',
 });
 var s3  = new AWS.S3({
-  // minio用
-  accessKeyId: 'admin' ,
-  secretAccessKey: 'yujjiba00',
-  endpoint: 'http://compact.myhome.or.jp:9000',
-  s3ForcePathStyle: true, // needed with minio?
-  signatureVersion: 'v4'
 });
 
 async function load_scenario(name){
