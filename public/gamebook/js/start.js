@@ -299,7 +299,7 @@ var vue_options = {
         },
         scenario_move: function(id){
             this.selected_scenario = id + '.json';
-            this.scenario_change();
+            this.scenario_reload();
         },
 
         scene_normalize: function(scene){
