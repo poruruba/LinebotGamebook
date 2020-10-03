@@ -1,12 +1,15 @@
 'use strict';
 
-const IMAGE_URL_BASE = "【linebot_imageのエンドポイントURL】";
-const AUDIO_URL_BASE = "【音声ファイルの公開URL】";
+const IMAGE_URL_BASE = "https://garden.poruru.site:10443/linebot_image/";
+const AUDIO_URL_BASE = "https://garden.poruru.site:10443/gamebook/audio/";
 
 const line = require('@line/bot-sdk');
 const mm = require('music-metadata');
 
 const HELPER_BASE = process.env.HELPER_BASE || '../../helpers/';
+
+const AWS_ENABLE = false;
+const FILE_ENABLE = true;
 
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -19,15 +22,14 @@ const DEFAULT_SCENARIO = process.env.DEFAULT_SCENARIO || 'scenario0';
 const DEFAULT_SCENE = process.env.DEFAULT_SCENE || '0';
 
 /* S3用 */
-const SCENARIO_BUCKET = process.env.SCENARIO_BUCKET || 'gamebook';
+const CONTENTS_BUCKET = process.env.CONTENTS_BUCKET || 'gamebook';
 const SCENARIO_OBJECT_BASE = 'scenario/';
-const AUDIO_BUCKET = process.env.AUDIO_BUCKET || 'gamebook';
 const AUDIO_OBJECT_BASE = 'audio/';
 
 /* ファイル用 */
-const SCENARIO_FILE_BASE = './public/gamebook/scenario/';
+const SCENARIO_FILE_BASE = './data/gamebook/scenario/';
+const STATE_FILE_BASE = './data/gamebook/users/';
 const AUDIO_FILE_BASE = './public/gamebook/audio/';
-const STATE_FILE_BASE = './data/gamebook/';
 const fs = require('fs').promises;
 
 const TABLE_NAME = "gamebook";
@@ -42,52 +44,58 @@ var s3  = new AWS.S3({
 });
 
 async function load_scenario(name){
-/*
-  // S3用
-  var param_get = {
-    Bucket: SCENARIO_BUCKET,
-    Key: SCENARIO_OBJECT_BASE + name + ".json"
-  };
-  var image = await s3.getObject(param_get).promise();
-  return JSON.parse(image.Body.toString());
-*/
-  // ファイル用
-  var buffer = await fs.readFile(SCENARIO_FILE_BASE + name + '.json', "utf-8");
-  return JSON.parse(buffer.toString());
+  if( AWS_ENABLE ){
+    // S3用
+    var param_get = {
+      Bucket: CONTENTS_BUCKET,
+      Key: SCENARIO_OBJECT_BASE + name + ".json"
+    };
+    var image = await s3.getObject(param_get).promise();
+    return JSON.parse(image.Body.toString());
+  }
+  if( FILE_ENABLE ){
+    // ファイル用
+    var buffer = await fs.readFile(SCENARIO_FILE_BASE + name + '.json', "utf-8");
+    return JSON.parse(buffer.toString());
+  }
 }
 
 async function load_audio(name){
-/*
-  // S3用
-  var param_get = {
-    Bucket: AUDIO_BUCKET,
-    Key: AUDIO_OBJECT_BASE + name + ".m4a"
-  };
-  var image = await s3.getObject(param_get).promise();
-  return image.Body;
-*/
-  // ファイル用
-  return await fs.readFile(AUDIO_FILE_BASE + name + '.m4a');
+  if( AWS_ENABLE ){
+    // S3用
+    var param_get = {
+      Bucket: CONTENTS_BUCKET,
+      Key: AUDIO_OBJECT_BASE + name + ".m4a"
+    };
+    var image = await s3.getObject(param_get).promise();
+    return image.Body;
+  }
+  if( FILE_ENABLE ){
+    // ファイル用
+    return await fs.readFile(AUDIO_FILE_BASE + name + '.m4a');
+  }
 }
 
 async function load_status(userid){
-/*
-  // S3用
-  var params_get = {
-    TableName: TABLE_NAME,
-    Key: {
-      userid: userid,
+  if( AWS_ENABLE ){
+    // DynamoDB用
+    var params_get = {
+      TableName: TABLE_NAME,
+      Key: {
+        userid: userid,
+      }
+    };
+    var result = await docClient.get(params_get).promise();
+    return result.Item;
+  }
+  if( FILE_ENABLE ){
+    // ファイル用
+    try{
+      var status = await fs.readFile(STATE_FILE_BASE + userid + '.json', 'utf8');
+      return JSON.parse(status);
+    }catch(error){
+      return undefined;
     }
-  };
-  var result = await docClient.get(params_get).promise();
-  return result.Item;
-*/
-  // ファイル用
-  try{
-    var status = await fs.readFile(STATE_FILE_BASE + userid + '.json', 'utf8');
-    return JSON.parse(status);
-  }catch(error){
-    return undefined;
   }
 }
 
@@ -102,46 +110,50 @@ async function create_status(userid, scenario, scene){
 }
 
 async function insert_status(status){
-/*
-  // S3用
-  var params_put = {
-    TableName: TABLE_NAME,
-    Item: status
-  };
-  return await docClient.put(params_put).promise();
-*/
-  // ファイル用
-  return fs.writeFile(STATE_FILE_BASE + status.userid + '.json', JSON.stringify(status), 'utf8');
+  if( AWS_ENABLE ){
+    // DynamoDB用
+    var params_put = {
+      TableName: TABLE_NAME,
+      Item: status
+    };
+    return await docClient.put(params_put).promise();
+  }
+  if( FILE_ENABLE ){
+    // ファイル用
+    return fs.writeFile(STATE_FILE_BASE + status.userid + '.json', JSON.stringify(status), 'utf8');
+  }
 }
 
 async function update_status(status){
-/*
-  // S3用
-  var params_update = {
-    TableName: TABLE_NAME,
-    Key: {
-      userid: status.userid
-    },
-    ExpressionAttributeNames: {
-      '#attr1': 'scenario',
-      '#attr2': 'scene',
-      '#attr3': 'items',
-      '#attr4': 'turn',
-    },
-    ExpressionAttributeValues: {
-      ':attrValue1': status.scenario,
-      ':attrValue2': status.scene,
-      ':attrValue3': status.items,
-      ':attrValue4': status.turn,
-    },
-    UpdateExpression: 'SET #attr1 = :attrValue1, #attr2 = :attrValue2, #attr3 = :attrValue3 , #attr4 = :attrValue4',
-    ConditionExpression: "attribute_exists(userid)",
-    ReturnValues:"ALL_NEW"
-  };
-  return await docClient.update(params_update).promise();
-*/
-  // ファイル用
-  return insert_status(status);
+  if( AWS_ENABLE ){
+    // DynamoDB用
+    var params_update = {
+      TableName: TABLE_NAME,
+      Key: {
+        userid: status.userid
+      },
+      ExpressionAttributeNames: {
+        '#attr1': 'scenario',
+        '#attr2': 'scene',
+        '#attr3': 'items',
+        '#attr4': 'turn',
+      },
+      ExpressionAttributeValues: {
+        ':attrValue1': status.scenario,
+        ':attrValue2': status.scene,
+        ':attrValue3': status.items,
+        ':attrValue4': status.turn,
+      },
+      UpdateExpression: 'SET #attr1 = :attrValue1, #attr2 = :attrValue2, #attr3 = :attrValue3 , #attr4 = :attrValue4',
+      ConditionExpression: "attribute_exists(userid)",
+      ReturnValues:"ALL_NEW"
+    };
+    return await docClient.update(params_update).promise();
+  }
+  if( FILE_ENABLE ){
+    // ファイル用
+    return insert_status(status);
+  }
 }
 
 function add_item(item_list, item){
@@ -381,12 +393,15 @@ app.message(async (event, client) =>{
       }
     };
 
-    if( scene.image ){
+    if( scene.image && scene.image.background ){
       // 画像が指定されていた場合
       var image_url = IMAGE_URL_BASE + scene.image.background;
       // 画像合成が指定されていた場合
       if(scene.image.composite ){
         scene.image.composite.forEach( select => {
+          if( !select.name )
+            return;
+
           // アイテムの所持・非所持確認
           var condition = check_condition(status.items, select.have, select.nothave );
           if( !condition )
@@ -427,8 +442,11 @@ app.message(async (event, client) =>{
     });
 
     // 次の選択肢
-    if( scene.selection){
+    if( scene.selection ){
       scene.selection.forEach( select =>{
+        if( !select.id )
+          return;
+          
         // アイテムの所持・非所持確認
         var condition = check_condition(status.items, select.have, select.nothave );
         if( !condition )
@@ -475,7 +493,7 @@ app.message(async (event, client) =>{
     }
     messages.push(flex);
 
-    if( scene.audio ){
+    if( scene.audio && scene.audio.name ){
       // 音声ファイルが指定されていた場合
       // アイテムの所持・非所持確認
       var condition = check_condition(status.items, scene.audio.have, scene.audio.nothave );

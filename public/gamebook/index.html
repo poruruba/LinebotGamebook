@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src * data: gap: https://ssl.gstatic.com 'unsafe-eval' 'unsafe-inline'; style-src * 'unsafe-inline'; media-src * 'unsafe-inline' data: content: blob:; img-src * data: content: blob:;">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="msapplication-tap-highlight" content="no">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous"></script>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
+  <!-- Latest compiled and minified JavaScript -->
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="css/start.css">
+  <script src="js/methods_bootstrap.js"></script>
+  <script src="js/components_bootstrap.js"></script>
+  <script src="js/vue_utils.js"></script>
+
+  <script src="dist/js/vconsole.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+  <script src="https://unpkg.com/vuejs-paginate@latest"></script>
+
+  <title>Gamebook：シナリオエディタ</title>
+</head>
+<body>
+    <div id="top" class="container">
+        <h1>Gamebook：シナリオエディタ</h1>
+        <br>
+
+        <ul class="nav nav-tabs">
+          <li class="active"><a href="#scenario_tab" data-toggle="tab">シナリオ編集</a></li>
+          <li><a href="#images_tab" data-toggle="tab">画像リスト</a></li>
+          <li><a href="#audio_tab" data-toggle="tab">音声リスト</a></li>
+        </ul>
+
+
+        <div class="tab-content">
+        	<div class="tab-pane" id="audio_tab">
+            <br>
+            <button class="btn btn-default" v-on:click="dialog_open('#upload_audio_dialog')">アップロード</button>
+            <button class="btn btn-default" v-on:click="audio_list_reload()">リロード</button>
+            <br><br>
+            <ul>
+              <li v-for="(value, index) in audio_list"><button class="btn btn-default" v-on:click="audio_play(value)">再生</button><button class="btn btn-default" v-on:click="audio_delete(value)">削除</button> {{value}}</li>
+            </ul>
+          </div>
+
+          <div class="tab-pane" id="images_tab">
+            <br>
+            <button class="btn btn-default" v-on:click="dialog_open('#upload_dialog')">アップロード</button>
+            <button class="btn btn-default" v-on:click="image_list_reload()">リロード</button>
+            <br>
+            <pagenation-bar v-model="image_page_index" v-bind:count="image_page_count"></pagenation-bar>
+            <br>
+            <div class="col-xs-4" v-for="(value, index) in image_list_partial">
+              <div class="panel panel-default">
+                <div class="panel-heading">{{value}} <button class="btn btn-default btn-xs pull-right" v-on:click="image_delete(value)">削除</button>
+                </div>
+                <div class="panel-body">
+                  <img class="img-responsive" v-bind:src="image_base_url + value" v-on:click="image_show(value)">
+                </div>
+              </div>
+            </div>
+            <br>
+          </div>
+
+        	<div class="tab-pane active" id="scenario_tab">
+            <br>
+            <div class="form-inline">
+              <select class="form-control" v-model="selecting_scenario">
+                <option value='' disabled selected>選択してください</option>
+                <option v-for="(value, index) in scenario_list" v-bind:value="value">{{value}}</option>
+              </select>
+              <button class="btn btn-default" v-on:click="scenario_reload()">ロード</button>
+              <button class="btn btn-default" v-on:click="scenario_create()">新規作成</button>
+              <button class="btn btn-default" v-on:click="scenario_delete()">削除</button>
+            </div>
+            <hr>
+
+            <div v-if="scenario">
+              <button class="btn btn-default" v-on:click="scenario_reload()">リロード</button>
+              <button class="btn btn-default" v-on:click="scenario_save()">保存</button>
+              <br><br>
+              <div class="form-inline">
+                <label>scenario</label> {{selected_scenario}}<br>
+                <label>title</label> <input type="text" class="form-control" v-model="scenario.title" />
+                <br><br>
+                <label>scene id</label> <select class="form-control" v-model.number="selecting_scene_index" v-on:change="scene_change">
+                  <option value='-1' disabled selected>選択してください</option>
+                  <option v-for="(value, index) in scene_list" v-bind:value="index">{{value.id}}</option>
+                </select>
+                <button class="btn btn-default" v-on:click="scene_add()">新規作成</button>
+                <button class="btn btn-default" v-on:click="scene_remove()">削除</button>
+              </div>
+              <br>
+
+              <div v-if="scene">
+                <div class="form-inline">
+                  <label>title</label> <input type="text" class="form-control" v-model="scene.title" />
+                </div>
+                <label>text</label> <textarea type="text" class="form-control" rows="3" v-model="scene.text"></textarea>
+                <br>
+                <div class="form-inline">
+                  <label>image.background</label> <input type="text" class="form-control" v-model="scene.image.background" /> <button class="btn btn-default" v-on:click="update_image_url">再描画</button>
+                </div>
+                <label>image.composite</label>
+                <ul>
+                  <li class="form-inline" v-for="(value, index) in scene.image.composite">
+                    <input type="number" class="form-control" size="2" max="12" min="1" v-model.number="value.position">
+                    <input type="text" class="form-control" v-model="value.name" /> 
+                    <button class="btn btn-default" v-on:click="composite_remove(index)">削除</button>
+                    <br>
+                    &nbsp;&nbsp;<label>have</label> [&nbsp;<span v-for="(value2, index2) in value.have">{{value2}}<button class="btn btn-default btn-xs">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs">追加</button>&nbsp;]<br>
+                    &nbsp;&nbsp;<label>nothave</label> [&nbsp;<span v-for="(value2, index2) in value.nothave">{{value2}}<button class="btn btn-default btn-xs">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs">追加</button>&nbsp;]
+                  </li>
+                  <li><button class="btn btn-default" v-on:click="composite_add()">追加</button></li>
+                </ul>
+                <img v-if="scene.image.background" v-bind:src="image_url"> 
+
+                <br><br>
+                <label>selection</label>
+                <ul>
+                  <li class="form-inline" v-for="(value, index) in scene.selection">
+                    <select class="form-control" v-model="value.type">
+                      <option value="scene">scene</option>
+                      <option value="scenario">scenario</option>
+                    </select>
+                    <input type="text" class="form-control" v-model="value.id">
+                    <input type="text" class="form-control" v-model="value.title">
+                    <button v-if="value.type=='scenario'" class="btn btn-default" v-on:click="scennario_move(value.id)">移動</button>
+                    <button v-if="value.type=='scene'" class="btn btn-default" v-on:click="scene_move(value.id)">移動</button>
+                    <button class="btn btn-default" v-on:click="selection_remove(index)">削除</button>
+                    <br>
+                    &nbsp;&nbsp;<label>have</label> [&nbsp;<span v-for="(value2, index2) in value.have">{{value2}}<button class="btn btn-default btn-xs" v-on:click="value.have = item_remove(value.have, index2)">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs" v-on:click="value.have = item_add(value.have)">追加</button>&nbsp;]<br>
+                    &nbsp;&nbsp;<label>nothave</label> [&nbsp;<span v-for="(value2, index2) in value.nothave">{{value2}}<button class="btn btn-default btn-xs" v-on:click="value.nothave = item_remove(value.nothave, index2)">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs" v-on:click="value.nothave = item_add(value.nothave)">追加</button>&nbsp;]
+                  </li>
+                  <li><button class="btn btn-default" v-on:click="selection_add()">追加</button></li>
+                </ul>
+
+                <br>
+                <div class="form-inline">
+                  <label>audio</label> <input type="text" class="form-control" v-model="scene.audio.name">
+                  <button class="btn btn-default" v-on:click="audio_play(scene.audio.name)">再生</button>
+                </div>
+                &nbsp;&nbsp;<label>have</label> [&nbsp;<span v-for="(value2, index2) in scene.audio.have">{{value2}}<button class="btn btn-default btn-xs" v-on:click="scene.audio.have = item_remove(scene.audio.have, index2)">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs" v-on:click="scene.audio.have = item_add(scene.audio.have)">追加</button>&nbsp;]<br>
+                &nbsp;&nbsp;<label>nothave</label> [&nbsp;<span v-for="(value2, index2) in scene.audio.nothave">{{value2}}<button class="btn btn-default btn-xs" v-on:click="scene.audio.nothave = item_remove(scene.audio.nothave, index2)">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs" v-on:click="scene.audio.nothave = item_add(scene.audio.nothave)">追加</button>&nbsp;]
+
+                <br><br>
+                <label>acquire</label> [&nbsp;<span v-for="(value2, index2) in scene.acquire">{{value2}}<button class="btn btn-default btn-xs" v-on:click="scene.acquire = item_remove(scene.acquire, index2)">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs" v-on:click="scene.acquire = item_add(scene.acquire)">追加</button>&nbsp;]<br>
+                <label>lost</label> [&nbsp;<span v-for="(value2, index2) in scene.lost">{{value2}}<button class="btn btn-default btn-xs" v-on:click="scene.lost = item_remove(scene.lost, index2)">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs" v-on:click="scene.lost = item_add(scene.lost)">追加</button>&nbsp;]
+
+              </div>
+            </div>
+            <br>
+          </div>
+        </div>
+
+        <modal-dialog id="upload_dialog">
+          <div slot="content">
+            <div class="modal-header">
+              <h4>画像ファイルアップロード</h4>
+            </div>
+            <div class="modal-body">
+              <input type="file" id="image_file" accept="image/png" v-on:change="image_open" v-on:click="image_click">
+              <img v-if="!image_src" class="center-block" src="img/image_drop.png" v-on:drop="image_drop" v-on:dragover="file_drag">
+              <img v-if="image_src" class="center-block img-responsive" v-bind:src="image_src" v-on:drop="image_drop" v-on:dragover="file_drag">
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-default" v-on:click="image_upload">アップロード</button>
+              <button class="btn btn-default" v-on:click="dialog_close('#upload_dialog')">キャンセル</button>
+            </div>
+          </div>
+        </modal-dialog>
+
+        <modal-dialog id="upload_audio_dialog">
+          <div slot="content">
+            <div class="modal-header">
+              <h4>音声ファイルアップロード</h4>
+            </div>
+            <div class="modal-body">
+              <input type="file" id="audio_file" accept="audio/aac" v-on:change="audio_open" v-on:click="audio_click">
+              <img class="center-block" src="img/image_drop.png" v-on:drop="audio_drop" v-on:dragover="file_drag">
+              <button v-if="audio" class="btn btn-default" v-on:click="audio_play()">再生</button>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-default" v-on:click="audio_upload">アップロード</button>
+              <button class="btn btn-default" v-on:click="dialog_close('#upload_audio_dialog')">キャンセル</button>
+            </div>
+          </div>
+        </modal-dialog>
+
+        <modal-dialog id="show_image_dialog" size="lg">
+          <div slot="content">
+            <div class="modal-header">
+              <h4>{{image_show_name}}</h4>
+            </div>
+            <div class="modal-body">
+              <img class="center-block img-responsive" v-bind:src="image_show_url">
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-default" v-on:click="dialog_close('#show_image_dialog')">閉じる</button>
+            </div>
+          </div>
+        </modal-dialog>
+
+        <!-- for progress-dialog -->
+        <progress-dialog v-bind:title="progress_title"></progress-dialog>
+    </div>
+
+    <script src="js/start.js"></script>
+</body>
