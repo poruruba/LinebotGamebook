@@ -298,7 +298,7 @@ var vue_options = {
             this.scenario_list_reload();
         },
         scenario_move: function(id){
-            this.selected_scenario = id + '.json';
+            this.selecting_scenario = id + '.json';
             this.scenario_reload();
         },
 
