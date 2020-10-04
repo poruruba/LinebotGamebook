@@ -2,9 +2,8 @@
 
 const HELPER_BASE = process.env.HELPER_BASE || '../../helpers/';
 const Response = require(HELPER_BASE + 'response');
-const BinResponse = require(HELPER_BASE + 'binresponse');
 
-const sharp = require('sharp');
+const path = require('path');
 
 const AWS_ENABLE = false;
 const FILE_ENABLE = true;
@@ -27,22 +26,6 @@ const IMAGE_FILE_BASE = './public/gamebook/images/';
 const AUDIO_FILE_BASE = './public/gamebook/audio/';
 const SCENARIO_FILE_BASE = './data/gamebook/scenario/';
 const fs = require('fs').promises;
-
-async function load_image(name){
-  if( AWS_ENABLE ){
-    // S3用
-    var param_get = {
-      Bucket: CONTENTS_BUCKET,
-      Key: IMAGE_OBJECT_BASE + name + ".png"
-    };
-    var image = await s3.getObject(param_get).promise();
-    return image.Body;
-  }
-  if( FILE_ENABLE ){
-    // ファイル用
-    return fs.readFile(IMAGE_FILE_BASE + name + ".png");
-  }
-}
 
 async function load_scenario(fname){
   if( AWS_ENABLE ){
@@ -156,87 +139,56 @@ async function list_files(type){
 
 exports.handler = async (event, context, callback) => {
   console.log(event);
-  if( event.path.startsWith('/linebot-image/') ){
-    var paths = decodeURIComponent(event.path).split('/');
-    var words = paths[2].split('-');
+  switch( event.path ){
+    case '/linebot-upload':{
+      var body = JSON.parse(event.body);
+      var ext;
+      if( body.type == 'image') ext = '.png';
+      else if( body.type == 'audio') ext = '.m4a';
+      else return new Response().set_error('unknown type');
 
-    const image_buffer = await load_image(words[0]);
-    const image = sharp(image_buffer);
-    const image_meta = await image.metadata();
-    var width = image_meta.width;
-    var unit = width / 12.0;
-
-    var list = [];
-    for( var i = 1 ; i < words.length ; i++ ){
-      var params = words[i].split('_');
-      const add_buffer = await load_image(params[0]);
-      const add = sharp(add_buffer);
-      const add_meta = await add.metadata();
-
-      var position = ( params.length > 1 ) ? parseInt(params[1]) : 6;
-      var left = Math.floor(position * unit - unit / 2 - add_meta.width / 2);
-
-      list.push({
-        input: add_buffer,
-        left : (left < 0) ? 0 : left,
-        top: (add_meta.height < image_meta.height ) ? (image_meta.height - add_meta.height) : 0,
-      })
+      var fname = event.files.upfile[0].originalname;
+      if( path.extname(fname).toLowerCase() == ext.toLowerCase() )
+        fname = fname.slice(0, -ext.length) + ext;
+      else
+        fname += ext;
+      await update_object(body.type, fname, event.files.upfile[0].buffer);
+      return new Response({ result: 'OK'});
     }
-    image.composite(list);
-
-    return image.toBuffer()
-    .then(buffer =>{
-      return new BinResponse('image/png', buffer);
-    });
-  }else{
-    switch( event.path ){
-      case '/linebot-upload':{
-        var body = JSON.parse(event.body);
-        var ext;
-        if( body.type == 'image') ext = '.png';
-        else if( body.type == 'audio') ext = '.m4a';
-        else return new Response().set_error('unknown type');
-
-        var fname = event.files.upfile[0].originalname;
-        if( fname.endsWith(ext.toUpperCase()) )
-          fname = fname.slice(0, -4) + ext;
-        if( !fname.endsWith(ext))
-          fname += ext;
-        await update_object(body.type, fname, event.files.upfile[0].buffer);
+    case '/linebot-contents':{
+      var body = JSON.parse(event.body);
+      if( body.cmd == 'list' ){
+        var list = await list_files(body.type);
+        if( body.type == 'image' || body.type == 'audio'){
+          for( var i = 0 ; i < list.length ; i++ )
+            list[i] = list[i].slice(0, -4);
+        }
+        return new Response(list);
+      }else
+      if( body.cmd == 'delete' ){
+        var fname;
+        if( body.type == 'image') fname = body.name + '.png';
+        else if( body.type == 'audio') fname = body.name + '.m4a';
+        else fname = body.fname;
+        await delete_file(body.type, fname);
         return new Response({ result: 'OK'});
       }
-      case '/linebot-contents':{
-        var body = JSON.parse(event.body);
-        if( body.cmd == 'list' ){
-          var list = await list_files(body.type);
-          if( body.type == 'image' || body.type == 'audio'){
-            for( var i = 0 ; i < list.length ; i++ )
-              list[i] = list[i].slice(0, -4);
+      if( body.type == 'scenario'){
+        switch(body.cmd){
+          case 'create':
+          case 'update':{
+            await update_object('scenario', body.fname, JSON.stringify(body.scenario, 0, 2));
+            return new Response({});
           }
-          return new Response(list);
-        }else
-        if( body.cmd == 'delete' ){
-          var fname;
-          if( body.type == 'image') fname = body.name + '.png';
-          else if( body.type == 'audio') fname = body.name + '.m4a';
-          else fname = body.fname;
-          await delete_file(body.type, fname);
-          return new Response({ result: 'OK'});
-        }
-        if( body.type == 'scenario'){
-          switch(body.cmd){
-            case 'create':
-            case 'update':{
-              await update_object('scenario', body.fname, JSON.stringify(body.scenario, 0, 2));
-              return new Response({});
-            }
-            case 'download':{
-              var scenario = await load_scenario(body.fname);
-              return new Response(JSON.parse(scenario));
-            }
+          case 'download':{
+            var scenario = await load_scenario(body.fname);
+            return new Response(JSON.parse(scenario));
           }
+          default:
+            return new Response().set_error('unknown cmd');
         }
-        break;
+      }else{
+        return new Response().set_error('unknown type');
       }
     }
   }
