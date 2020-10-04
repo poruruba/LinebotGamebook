@@ -4,14 +4,6 @@ info:
   title: Lambda Laboratory Server
   
 paths:
-  /linebot-image/*:
-    get:
-      responses:
-        200:
-          description: Success
-          schema:
-            $ref: "#/definitions/CommonResponse"
-
   /linebot-contents:
     post:
       parameters:
