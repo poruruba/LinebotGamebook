@@ -236,24 +236,32 @@ var vue_options = {
             this.scenario_list = await do_post(contents_url, param);
             this.selecting_scenario = '';
         },
-        scenario_reload: async function(){
-            if( !this.selecting_scenario )
+        scenario_load: async function(load_scenario, scene){
+            if( !load_scenario )
                 return;
-            if( this.selected_scenario && !confirm('本当に編集中のシナリオを破棄してリロードしますか？') )
+            if( this.selected_scenario && this.selected_scenario != load_scenario && !confirm('本当に編集中のシナリオを破棄してリロードしますか？') )
                 return;
 
-            this.selected_scenario = this.selecting_scenario;
             var param = {
                 cmd: 'download',
                 type: 'scenario',
-                fname: this.selected_scenario
+                fname: load_scenario
             };
             var scenario = await do_post(contents_url, param );
             scenario.scene.forEach(item => item = this.scene_normalize(item));
+            this.selected_scenario = load_scenario;
             this.scenario = scenario;
             this.scene_list = this.scenario.scene;
-            this.selecting_scene_index = -1;
-            this.scene = null;
+            if( scene ){
+                this.selecting_scene_index = this.scene_list.findIndex(item => item.id == scene);
+                this.scene_change();
+            }else{
+                this.selecting_scene_index = -1;
+                this.scene = null;
+            }
+        },
+        scenario_reload: async function(scene){
+            this.scenario_reload(this.selected_scenario, scene);
         },
         scenario_delete: async function(){
             if( !this.selecting_scenario )
@@ -316,9 +324,8 @@ var vue_options = {
                 alert(error);
             }
         },
-        scenario_move: function(id){
-            this.selecting_scenario = id + '.json';
-            this.scenario_reload();
+        scenario_move: function(id, scene){
+            this.scenario_load(id + '.json', scene ? scene : "0");
         },
 
         scene_normalize: function(scene){
@@ -407,6 +414,12 @@ var vue_options = {
         },
         selection_remove: function(index){
             this.scene.selection.splice(index, 1);
+        },
+        select_type_change: function(index){
+            if( this.scene.selection[index].type == 'scenario' )
+                this.scene.selection[index].scene = '0';
+            else
+                delete this.scene.selection[index].scene;
         },
         composite_add: function(){
             this.scene.image.composite.push({
