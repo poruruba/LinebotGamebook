@@ -1,7 +1,7 @@
 'use strict';
 
 const IMAGE_URL_BASE = "【サーバのURL】/linebot_image/";
-const AUDIO_URL_BASE = "【サーバのURL】/gamebook/audio/";
+const AUDIO_URL_BASE = "【音声ファイルのURL】";
 
 const line = require('@line/bot-sdk');
 const mm = require('music-metadata');
