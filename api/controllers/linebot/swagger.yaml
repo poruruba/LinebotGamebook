@@ -24,5 +24,4 @@ paths:
         200:
           description: Success
           schema:
-            $ref: "#/definitions/CommonResponse"
-            
+            type: file            
