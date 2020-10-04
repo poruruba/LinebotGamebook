@@ -2,9 +2,9 @@
 
 //var vConsole = new VConsole();
 
-const contents_upload_url = "【ファイルアップロード用エンドポイントのURL】";
-const contents_url = "【シナリオエディタ用エンドポイントのURL】";
-const image_base_url = "【画像処理用エンドポイントのURL】";
+const contents_upload_url = "【サーバのURL】/linebot-upload";
+const contents_url = "【サーバのURL】/linebot-contents";
+const image_base_url = "【サーバのURL】/linebot-image/";
 const audio_base_url = "【音声ファイルのURL】";
 
 const NUM_OF_PAGE_IMAGES = 12;
