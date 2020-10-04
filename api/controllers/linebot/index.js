@@ -1,7 +1,7 @@
 'use strict';
 
-const IMAGE_URL_BASE = "https://garden.poruru.site:10443/linebot_image/";
-const AUDIO_URL_BASE = "https://garden.poruru.site:10443/gamebook/audio/";
+const IMAGE_URL_BASE = "【サーバのURL】/linebot_image/";
+const AUDIO_URL_BASE = "【サーバのURL】/gamebook/audio/";
 
 const line = require('@line/bot-sdk');
 const mm = require('music-metadata');
