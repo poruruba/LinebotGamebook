@@ -55,6 +55,7 @@ var vue_options = {
                 await this.image_list_reload();
             }catch(error){
                 console.log(error);
+                alert(error);
             }
         },
         image_list_reload: async function(){
@@ -67,6 +68,7 @@ var vue_options = {
                 this.image_page_count = Math.ceil( this.image_list / NUM_OF_PAGE_IMAGES);
             }catch(error){
                 console.log(error);
+                alert(error);
             }
         },
 
@@ -148,6 +150,7 @@ var vue_options = {
                 await this.audio_list_reload();
             }catch(error){
                 console.log(error);
+                alert(error);
             }
         },
         audio_list_reload: async function(){
@@ -159,6 +162,7 @@ var vue_options = {
                 this.audio_list = await do_post(contents_url, body);
             }catch(error){
                 console.log(error);
+                alert(error);
             }
         },        
         audio_upload: async function(){
@@ -262,8 +266,13 @@ var vue_options = {
                 cmd: 'delete',
                 fname: this.selecting_scenario,
             };
-            await do_post(contents_url, body);
-            this.scenario_list_reload();
+            try{
+                await do_post(contents_url, body);
+                this.scenario_list_reload();
+            }catch(error){
+                console.error(error);
+                alert(error);
+            }
         },
         scenario_save: async function(){
             var body = {
@@ -272,8 +281,13 @@ var vue_options = {
                 fname: this.selected_scenario,
                 scenario: this.scenario
             }
-            await do_post(contents_url, body);
-            alert('保存しました。');
+            try{
+                await do_post(contents_url, body);
+                alert('保存しました。');
+            }catch(error){
+                console.error(error);
+                alert(error);
+            }
         },
         scenario_create: async function(){
             var fname = window.prompt("シナリオファイル名を入力してください。");
@@ -294,8 +308,13 @@ var vue_options = {
                 fname: fname,
                 scenario: scenario
             };
-            await do_post(contents_url, body);
-            this.scenario_list_reload();
+            try{
+                await do_post(contents_url, body);
+                this.scenario_list_reload();
+            }catch(error){
+                console.error(error);
+                alert(error);
+            }
         },
         scenario_move: function(id){
             this.selecting_scenario = id + '.json';
@@ -403,7 +422,7 @@ var vue_options = {
         item_add: function(list){
             var name = window.prompt("nameを入力してください。");
             if( !name )
-                return;
+                return list;
 
             list.push(name);
             return list;
@@ -415,7 +434,7 @@ var vue_options = {
         
         update_image_url: function(){
             if(!this.scene || !this.scene.image.background)
-                return "";
+                this.image_url = "";
             var url = image_base_url + this.scene.image.background;
             for( var i = 0 ; i < this.scene.image.composite.length ; i++ ){
                 url += '-' + this.scene.image.composite[i].name + '_' + this.scene.image.composite[i].position;
