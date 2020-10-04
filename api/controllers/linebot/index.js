@@ -5,8 +5,10 @@ const AUDIO_URL_BASE = "https://garden.poruru.site:10443/gamebook/audio/";
 
 const line = require('@line/bot-sdk');
 const mm = require('music-metadata');
+const sharp = require('sharp');
 
 const HELPER_BASE = process.env.HELPER_BASE || '../../helpers/';
+const BinResponse = require(HELPER_BASE + 'binresponse');
 
 const AWS_ENABLE = false;
 const FILE_ENABLE = true;
@@ -26,13 +28,15 @@ const CONTENTS_BUCKET = process.env.CONTENTS_BUCKET || 'gamebook';
 const SCENARIO_OBJECT_BASE = 'scenario/';
 const AUDIO_OBJECT_BASE = 'audio/';
 
+/* DynamoDB用 */
+const TABLE_NAME = process.env.TABLE_NAME || "gamebook";
+
 /* ファイル用 */
 const SCENARIO_FILE_BASE = './data/gamebook/scenario/';
 const STATE_FILE_BASE = './data/gamebook/users/';
 const AUDIO_FILE_BASE = './public/gamebook/audio/';
+const IMAGE_FILE_BASE = './public/gamebook/images/';
 const fs = require('fs').promises;
-
-const TABLE_NAME = "gamebook";
 
 const AWS = require("aws-sdk");
 AWS.config.update({
@@ -43,36 +47,35 @@ const docClient = new AWS.DynamoDB.DocumentClient({
 var s3  = new AWS.S3({
 });
 
-async function load_scenario(name){
+async function load_scenario(fname){
   if( AWS_ENABLE ){
     // S3用
     var param_get = {
       Bucket: CONTENTS_BUCKET,
-      Key: SCENARIO_OBJECT_BASE + name + ".json"
+      Key: SCENARIO_OBJECT_BASE + fname
     };
-    var image = await s3.getObject(param_get).promise();
-    return JSON.parse(image.Body.toString());
+    var obj = await s3.getObject(param_get).promise();
+    return obj.Body;
   }
   if( FILE_ENABLE ){
     // ファイル用
-    var buffer = await fs.readFile(SCENARIO_FILE_BASE + name + '.json', "utf-8");
-    return JSON.parse(buffer.toString());
+    return await fs.readFile(SCENARIO_FILE_BASE + fname, "utf-8");
   }
 }
 
-async function load_audio(name){
+async function load_audio(fname){
   if( AWS_ENABLE ){
     // S3用
     var param_get = {
       Bucket: CONTENTS_BUCKET,
-      Key: AUDIO_OBJECT_BASE + name + ".m4a"
+      Key: AUDIO_OBJECT_BASE + fname
     };
     var image = await s3.getObject(param_get).promise();
     return image.Body;
   }
   if( FILE_ENABLE ){
     // ファイル用
-    return await fs.readFile(AUDIO_FILE_BASE + name + '.m4a');
+    return await fs.readFile(AUDIO_FILE_BASE + fname);
   }
 }
 
@@ -306,9 +309,11 @@ app.message(async (event, client) =>{
     status.turn++;
 
     // 現在のシナリオを取得
-    const scenario = await load_scenario(status.scenario);
+    let scenario = await load_scenario(status.scenario + '.json');
     if( !scenario )
       throw "scenario not found";
+    
+    scenario = JSON.parse(scenario);
 
     // 現在のシーンを取得
     var scene = scenario.scene.find(item => item.id == status.scene );
@@ -498,7 +503,7 @@ app.message(async (event, client) =>{
       // アイテムの所持・非所持確認
       var condition = check_condition(status.items, scene.audio.have, scene.audio.nothave );
       if( condition ){
-        var audio_buffer = await load_audio(scene.audio.name);
+        var audio_buffer = await load_audio(scene.audio.name + '.m4a');
         var metadata = await mm.parseBuffer(audio_buffer, "audio/aac")
         var message = {
           type: "audio",
@@ -528,3 +533,56 @@ app.message(async (event, client) =>{
 });
 
 exports.fulfillment = app.lambda();
+
+async function load_image(name){
+  if( AWS_ENABLE ){
+    // S3用
+    var param_get = {
+      Bucket: CONTENTS_BUCKET,
+      Key: IMAGE_OBJECT_BASE + name + ".png"
+    };
+    var image = await s3.getObject(param_get).promise();
+    return image.Body;
+  }
+  if( FILE_ENABLE ){
+    // ファイル用
+    return fs.readFile(IMAGE_FILE_BASE + name + ".png");
+  }
+}
+
+exports.handler = async (event, context, callback) => {
+  console.log(event);
+  if( event.path.startsWith('/linebot-image/') ){
+    var paths = decodeURIComponent(event.path).split('/');
+    var words = paths[2].split('-');
+
+    const image_buffer = await load_image(words[0]);
+    const image = sharp(image_buffer);
+    const image_meta = await image.metadata();
+    var width = image_meta.width;
+    var unit = width / 12.0;
+
+    var list = [];
+    for( var i = 1 ; i < words.length ; i++ ){
+      var params = words[i].split('_');
+      const add_buffer = await load_image(params[0]);
+      const add = sharp(add_buffer);
+      const add_meta = await add.metadata();
+
+      var position = ( params.length > 1 ) ? parseInt(params[1]) : 6;
+      var left = Math.floor(position * unit - unit / 2 - add_meta.width / 2);
+
+      list.push({
+        input: add_buffer,
+        left : (left < 0) ? 0 : left,
+        top: (add_meta.height < image_meta.height ) ? (image_meta.height - add_meta.height) : 0,
+      })
+    }
+    image.composite(list);
+
+    return image.toBuffer()
+    .then(buffer =>{
+      return new BinResponse('image/png', buffer);
+    });
+  }
+};
