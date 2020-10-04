@@ -81,7 +81,7 @@
                 <option value='' disabled selected>選択してください</option>
                 <option v-for="(value, index) in scenario_list" v-bind:value="value">{{value}}</option>
               </select>
-              <button class="btn btn-default" v-on:click="scenario_reload()">ロード</button>
+              <button class="btn btn-default" v-on:click="scenario_load(selecting_scenario)">ロード</button>
               <button class="btn btn-default" v-on:click="scenario_create()">新規作成</button>
               <button class="btn btn-default" v-on:click="scenario_delete()">削除</button>
             </div>
@@ -93,7 +93,7 @@
               <br><br>
               <div class="form-inline">
                 <label>scenario</label> {{selected_scenario}}<br>
-                <label>title</label> <input type="text" class="form-control" v-model="scenario.title" />
+                <label>title</label> <input type="text" class="form-control" v-model="scenario.title"/>
                 <br><br>
                 <label>scene id</label> <select class="form-control" v-model.number="selecting_scene_index" v-on:change="scene_change">
                   <option value='-1' disabled selected>選択してください</option>
@@ -116,8 +116,8 @@
                 <label>image.composite</label>
                 <ul>
                   <li class="form-inline" v-for="(value, index) in scene.image.composite">
-                    <input type="number" class="form-control" size="2" max="12" min="1" v-model.number="value.position">
-                    <input type="text" class="form-control" v-model="value.name" /> 
+                    <input type="number" class="form-control" size="2" max="12" min="1" v-model.number="value.position" placeholder="position">
+                    <input type="text" class="form-control" v-model="value.name"  placeholder="name" /> 
                     <button class="btn btn-default" v-on:click="composite_remove(index)">削除</button>
                     <br>
                     &nbsp;&nbsp;<label>have</label> [&nbsp;<span v-for="(value2, index2) in value.have">{{value2}}<button class="btn btn-default btn-xs">削除</button>&nbsp;</span>&nbsp;<button class="btn btn-default btn-xs">追加</button>&nbsp;]<br>
@@ -131,13 +131,14 @@
                 <label>selection</label>
                 <ul>
                   <li class="form-inline" v-for="(value, index) in scene.selection">
-                    <select class="form-control" v-model="value.type">
+                    <select class="form-control" v-model="value.type" v-on:change="select_type_change(index)">
                       <option value="scene">scene</option>
                       <option value="scenario">scenario</option>
                     </select>
-                    <input type="text" class="form-control" v-model="value.id">
-                    <input type="text" class="form-control" v-model="value.title">
-                    <button v-if="value.type=='scenario'" class="btn btn-default" v-on:click="scennario_move(value.id)">移動</button>
+                    <input type="text" class="form-control" v-model="value.id"  placeholder="id">
+                    <input v-if="value.type=='scenario'" type="text" class="form-control" v-model="value.scene"  placeholder="scene_id">
+                    <input type="text" class="form-control" v-model="value.title" placeholder="title">
+                    <button v-if="value.type=='scenario'" class="btn btn-default" v-on:click="scenario_move(value.id, value.scene)">移動</button>
                     <button v-if="value.type=='scene'" class="btn btn-default" v-on:click="scene_move(value.id)">移動</button>
                     <button class="btn btn-default" v-on:click="selection_remove(index)">削除</button>
                     <br>
