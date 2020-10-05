@@ -512,6 +512,7 @@ app.message(async (event, client) =>{
         };
         return client.replyMessage(event.replyToken, message);
       }
+      case 'スタート':
       case 'リタイア':{
         // コマンド：リタイア
         status = await create_status(event.source.userId, DEFAULT_SCENARIO, DEFAULT_SCENE);
@@ -561,7 +562,7 @@ app.message(async (event, client) =>{
       // 不明なコマンド
       var message = {
         type: "text",
-        text: "不明なコマンド",
+        text: "不明なコマンド。ヘルプは'@'",
       };
       return client.replyMessage(event.replyToken, message);
     }
