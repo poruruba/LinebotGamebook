@@ -59,11 +59,12 @@ class LineUtils{
     lambda(){
         return async (event, context, callback) => {
 //            console.log(context.req);
-            var body = JSON.parse(event.body);
 
             const signature = crypto.createHmac('SHA256', this.secret).update(event.body).digest('base64');
             if( signature != event.headers['x-line-signature'] )
                 return new Response().set_error('invalid signature');
+
+            var body = JSON.parse(event.body);
             
             return Promise.all(body.events.map((event) =>{
                 if( (event.type == 'message') &&
