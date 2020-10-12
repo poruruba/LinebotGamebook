@@ -65,7 +65,7 @@ var vue_options = {
             };
             try{
                 this.image_list = await do_post(contents_url, body);
-                this.image_page_count = Math.ceil( this.image_list / NUM_OF_PAGE_IMAGES);
+                this.image_page_count = Math.ceil( this.image_list.length / NUM_OF_PAGE_IMAGES);
             }catch(error){
                 console.log(error);
                 alert(error);
