@@ -72,7 +72,7 @@ class LineUtils{
                 if( (event.type == 'message') &&
                      (event.replyToken === '00000000000000000000000000000000' || event.replyToken === 'ffffffffffffffffffffffffffffffff' ))
                     return;
-                
+
                 var handler = this.map.get(event.type);
                 if( handler )
                     return handler(event, this.client);

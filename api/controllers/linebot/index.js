@@ -1,18 +1,25 @@
 'use strict';
 
-const IMAGE_URL_BASE = "【サーバのURL】/linebot_image/";
+const IMAGE_URL_BASE = "【サーバのURL】/linebot-image/";
 const AUDIO_URL_BASE = "【音声ファイルのURL】";
 
 const line = require('@line/bot-sdk');
 const mm = require('music-metadata');
 const sharp = require('sharp');
 
+const { URL, URLSearchParams } = require('url');
+const fetch = require('node-fetch');
+const Headers = fetch.Headers;
+
 const HELPER_BASE = process.env.HELPER_BASE || '../../helpers/';
+const Response = require(HELPER_BASE + 'response');
 const BinResponse = require(HELPER_BASE + 'binresponse');
 
 const AWS_ENABLE = false;
 const FILE_ENABLE = true;
 
+const LIFF_ID = process.env.LIFF_ID || "【LIFF ID】";
+const LINE_CHANNEL_ID = process.env.LINE_CHANNEL_ID;
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET,
@@ -102,13 +109,14 @@ async function load_status(userid){
   }
 }
 
-async function create_status(userid, scenario, scene){
+async function create_status(userid, scenario, scene, memories = []){
   return {
     userid: userid,
     scenario: scenario,
     scene: scene,
     turn: 0,
     items: [],
+    memories: memories,
   };
 }
 
@@ -205,7 +213,47 @@ function check_condition(items, have, nothave){
   return condition;
 }
 
-async function process_scenario(event, client, scenario, status){
+function make_image_url(scene, status){
+  if( !scene.image || !scene.image.background )
+    return null;
+    
+  // 画像が指定されていた場合
+  var image_url = IMAGE_URL_BASE + scene.image.background;
+  // 画像合成が指定されていた場合
+  if(scene.image.composite ){
+    scene.image.composite.forEach( select => {
+      if( !select.name )
+        return;
+
+      // アイテムの所持・非所持確認
+      var condition = check_condition(status.items, select.have, select.nothave );
+      if( !condition )
+        return;
+
+      // 合成画像の指定追加
+      image_url += '-' + select.name;
+      if( select.position != undefined )
+        image_url += '_' + select.position;
+    });
+  }
+
+  return image_url;
+}
+
+function get_audio_name(scene, status){
+  if( !scene.audio || !scene.audio.name )
+    return null;
+
+  // 音声ファイルが指定されていた場合
+  // アイテムの所持・非所持確認
+  var condition = check_condition(status.items, scene.audio.have, scene.audio.nothave );
+  if( !condition )
+    return null;
+  
+  return scene.audio.name;
+}
+
+async function process_scenario(scenario, status){
   // 現在のシーンを取得
   var scene = scenario.scene.find(item => item.id == status.scene );
   if( !scene )
@@ -257,26 +305,8 @@ async function process_scenario(event, client, scenario, status){
     }
   };
 
-  if( scene.image && scene.image.background ){
-    // 画像が指定されていた場合
-    var image_url = IMAGE_URL_BASE + scene.image.background;
-    // 画像合成が指定されていた場合
-    if(scene.image.composite ){
-      scene.image.composite.forEach( select => {
-        if( !select.name )
-          return;
-
-        // アイテムの所持・非所持確認
-        var condition = check_condition(status.items, select.have, select.nothave );
-        if( !condition )
-          return;
-
-        // 合成画像の指定追加
-        image_url += '-' + select.name;
-        if( select.position != undefined )
-          image_url += '_' + select.position;
-      });
-    }
+  var image_url = make_image_url(scene, status);
+  if( image_url ){
     flex.contents.hero = {
       type: "image",
       url: encodeURI(image_url),
@@ -360,20 +390,17 @@ async function process_scenario(event, client, scenario, status){
   }
   messages.push(flex);
 
-  if( scene.audio && scene.audio.name ){
+  var audio_name = get_audio_name(scene, status);
+  if( audio_name ){
     // 音声ファイルが指定されていた場合
-    // アイテムの所持・非所持確認
-    var condition = check_condition(status.items, scene.audio.have, scene.audio.nothave );
-    if( condition ){
-      var audio_buffer = await load_audio(scene.audio.name + '.m4a');
-      var metadata = await mm.parseBuffer(audio_buffer, "audio/aac")
-      var message = {
-        type: "audio",
-        originalContentUrl: encodeURI(AUDIO_URL_BASE + scene.audio.name + '.m4a'),
-        duration: Math.floor(metadata.format.duration * 1000) 
-      };
-      messages.push(message);
-    }
+    var audio_buffer = await load_audio(audio_name + '.m4a');
+    var metadata = await mm.parseBuffer(audio_buffer, "audio/aac")
+    var message = {
+      type: "audio",
+      originalContentUrl: encodeURI(AUDIO_URL_BASE + audio_name + '.m4a'),
+      duration: Math.floor(metadata.format.duration * 1000) 
+    };
+    messages.push(message);
   }
 
   //userIdのステータスをDBに更新
@@ -383,7 +410,8 @@ async function process_scenario(event, client, scenario, status){
   // メッセージの一括送信
   console.log(messages);
   console.log(JSON.stringify(messages));
-  return client.replyMessage(event.replyToken, messages);
+
+  return messages;
 }
 
 // ポストバック受信処理
@@ -435,7 +463,8 @@ app.postback(async (event, client) =>{
       throw "scenario not found";    
     scenario = JSON.parse(scenario);
 
-    return await process_scenario(event, client, scenario, status);
+    let messages = await process_scenario(scenario, status);
+    return client.replyMessage(event.replyToken, messages);
   }catch(error){
     console.error(error);
     var message = {
@@ -471,8 +500,39 @@ app.message(async (event, client) =>{
       case '@':{
         // コマンド：ヘルプ
         var message = {
-          type: "text",
-          text: "コマンドリスト\n  リタイア：最初からやり直し\n  リセット：今のシナリオの最初に戻る\n  リロード：再表示\n  持ち物：持ち物の確認\n  ステータス：シナリオ名の確認",
+          type: "flex",
+          altText: "ステータス",
+          contents: {
+            type: "bubble",
+            body: {
+              type: "box",
+              layout: "vertical",
+              contents: [
+                {
+                  type: "text",
+                  text: "コマンドリスト",
+                  weight: "bold",
+                  size: "md",
+                },
+                {
+                  type: "text",
+                  text: "リタイア：最初からやり直し\nリセット：今のシナリオの最初に戻る\nリロード：再表示\n持ち物：持ち物の確認\n記憶：シーンの記憶",
+                  size: "xs",
+                  wrap: true
+                },
+                {
+                  type: "button",
+                  action: {
+                    type: "uri",
+                    label: "ステータス",
+                    uri: "https://liff.line.me/" + LIFF_ID
+                  },
+                  height: "sm",
+                  style: "link"
+                }
+              ]
+            }
+          },
           quickReply: {
             items: [
               {
@@ -503,10 +563,10 @@ app.message(async (event, client) =>{
                 type: 'action',
                 action: {
                   type: "message",
-                  label: "ステータス",
-                  text: "ステータス"
+                  label: "記憶",
+                  text: "記憶"
                 }
-              },
+              }
             ]
           }
         };
@@ -515,26 +575,34 @@ app.message(async (event, client) =>{
       case 'スタート':
       case 'リタイア':{
         // コマンド：リタイア
-        status = await create_status(event.source.userId, DEFAULT_SCENARIO, DEFAULT_SCENE);
+        status = await create_status(event.source.userId, DEFAULT_SCENARIO, DEFAULT_SCENE, status.memories);
         let scenario = await load_scenario(status.scenario + '.json');
         if( !scenario )
           throw "scenario not found";
         scenario = JSON.parse(scenario);
 
-        return process_scenario(event, client, scenario, status);
+        let messages = await process_scenario(scenario, status);
+        return client.replyMessage(event.replyToken, messages);
       }
       case 'リセット':{
         // コマンド：リセット
         status.scene = DEFAULT_SCENE;
         status.items = [];
 
-        return process_scenario(event, client, scenario, status);
+        let messages = await process_scenario(scenario, status);
+        return client.replyMessage(event.replyToken, messages);
       }
       case 'リロード':{
         // コマンド：リロード
-        return process_scenario(event, client, scenario, status);
+        let messages = await process_scenario(scenario, status);
+        return client.replyMessage(event.replyToken, messages);
       }
     }
+
+    // 現在のシーンを取得
+    var scene = scenario.scene.find(item => item.id == status.scene );
+    if( !scene )
+      throw "scene not found";
 
     if( event.message.text == '持ち物' || event.message.text == 'もちもの'){
       // コマンド：持ち物
@@ -557,6 +625,26 @@ app.message(async (event, client) =>{
         type: "text",
         text: "シナリオ名：" + scenario.title + "\nシーン番号：" + status.scene,
       };
+    }else
+    if( event.message.text == '記憶' || event.message.text == 'きおく' ){
+      var audio_name = get_audio_name(scene, status);
+      var memory = {
+        scenario_name: status.scenario,
+        scene_id: status.scene,
+        scene_title: scene.title,
+        scene_text: scene.text,
+        image_url: make_image_url(scene, status),
+        audio_url: audio_name ? AUDIO_URL_BASE + audio_name + '.m4a' : null,
+        create_at: new Date().getTime()
+      };
+      if( !status.memories )
+        status.memories = [];
+      status.memories.push(memory);
+      await insert_status(status);
+      var message = {
+        type: "text",
+        text: "記憶に残しました",
+      };
       return client.replyMessage(event.replyToken, message);
     }else{
       // 不明なコマンド
@@ -574,6 +662,70 @@ app.message(async (event, client) =>{
     };
     return client.replyMessage(event.replyToken, message);
   }
+});
+
+app.follow(async (event, client) =>{
+  const welcome = {
+    title: "勇者の冒険",
+    text: "今勇者の冒険が始まる。"
+  };
+  
+  var message = {
+    type: "flex",
+    altText: welcome.text,
+    contents: {
+      type: "bubble",
+      size: "kilo",
+      body: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            wrap: true,
+            text: welcome.title,
+            weight: "bold",
+            size: "md"
+          },
+          {
+            type: "text",
+            wrap: true,
+            size: "sm",
+            text: welcome.text
+          }
+        ],
+      },
+      footer:{
+        type: "box",
+        layout: "vertical",
+        contents:[
+          {
+            type: "button",
+            style: "link",
+            height: "sm",
+            action:{
+              type: "message",
+              label: "始める",
+              text: "スタート"
+            }
+          }
+        ],
+        flex: 0
+      }
+    }
+  };
+
+  if( welcome.background ){
+    message.contents.hero = {
+      type: "image",
+      url: encodeURI(IMAGE_URL_BASE + welcome.background),
+      size: "full",
+      aspectRatio: "20:13",
+      aspectMode: "fit"
+    };
+  }
+
+  return client.replyMessage(event.replyToken, message);
 });
 
 exports.fulfillment = app.lambda();
@@ -628,5 +780,68 @@ exports.handler = async (event, context, callback) => {
     .then(buffer =>{
       return new BinResponse('image/png', buffer);
     });
+  }else
+  if( event.path == '/linebot-status' ){
+    console.log(event);
+    var body = JSON.parse(event.body);
+
+    try{
+      var json = await do_post_urlencoded('https://api.line.me/oauth2/v2.1/verify', { id_token: body.id_token, client_id: LINE_CHANNEL_ID } );
+      var userId = json.sub;
+
+      var status = await load_status(userId);
+      if( !status ){
+        throw "unknown user";
+      }
+
+      let scenario = await load_scenario(status.scenario + '.json');
+      if( !scenario )
+        throw "scenario not found";    
+      scenario = JSON.parse(scenario);
+    
+      if( body.cmd == 'delete' ){
+        var index = body.index;
+        status.memories.splice(index, 1);
+        update_status(status);
+
+        return new Response({ result: 'OK'});
+      }else{
+        // 現在のシーンを取得
+        var scene = scenario.scene.find(item => item.id == status.scene );
+        if( !scene )
+          throw "scene not found";
+
+        var audio_name = get_audio_name(scene, status);
+        var param = {
+          scenario_title: scenario.title,
+          scene_id: scene.id,
+          scene_title: scene.title,
+          scene_text: scene.text,
+          image_url: make_image_url(scene, status),
+          audio_url: audio_name ? (AUDIO_URL_BASE + audio_name + '.m4a') : null,
+          items: status.items,
+          memories: status.memories,
+        };
+        return new Response({ status: param });
+      }
+    }catch(error){
+      return new Response().set_error(error);
+    }
   }
 };
+
+function do_post_urlencoded(url, params) {
+  const headers = new Headers({ 'Content-Type': 'application/x-www-form-urlencoded' });
+  var body = new URLSearchParams(params);
+
+  return fetch(new URL(url).toString(), {
+      method: 'POST',
+      body: body,
+      headers: headers
+    })
+    .then((response) => {
+      if (!response.ok)
+        throw 'status is not 200';
+      return response.json();
+    })
+}

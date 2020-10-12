@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src * data: gap: https://ssl.gstatic.com 'unsafe-eval' 'unsafe-inline'; style-src * 'unsafe-inline'; media-src *; img-src * data: content: blob:;">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="msapplication-tap-highlight" content="no">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+
+  <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha384-nvAa0+6Qg9clwYCGGPpDQLVpLNn0fRaROjHqs13t4Ggj3Ez50XnGQqc/r8MhnRDZ" crossorigin="anonymous"></script>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" integrity="sha384-HSMxcRTRxnN+Bdg0JdbxYKrThecOKuH5zCYotlSAcp1+c8xmyTe9GYg1l9a69psu" crossorigin="anonymous">
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap-theme.min.css" integrity="sha384-6pzBo3FDv/PJ8r2KRkGHifhEocL+1X2rVCTTkUfGk7/0pbek5mMa1upzvWbrUbOZ" crossorigin="anonymous">
+  <!-- Latest compiled and minified JavaScript -->
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js" integrity="sha384-aJ21OjlMXNL5UyIl/XNwTMqvzeRMZH2w8c5cRVpzpU8Y5bApTppSuUkhZXN0VxHd" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="css/start.css">
+  <script src="js/methods_bootstrap.js"></script>
+  <script src="js/components_bootstrap.js"></script>
+  <script src="js/vue_utils.js"></script>
+
+  <script src="dist/js/vconsole.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+  <script src="https://unpkg.com/vuejs-paginate@latest"></script>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <title>Gamebook : ステータス</title>
+</head>
+<body>
+    <div id="top" class="container">
+        <h1>Gamebook : ステータス</h1>
+
+        <ul class="nav nav-tabs">
+          <li class="active"><a href="#status_tab" data-toggle="tab">ステータス</a></li>
+          <li><a href="#memories_tab" data-toggle="tab">回想</a></li>
+        </ul>
+
+        <div class="tab-content">
+        	<div class="tab-pane active" id="status_tab">
+            <h2>ステータス</h2>
+            <div v-if="status">
+              <label>scenario_title</label> {{status.scenario_title}}<br>
+              <label>scene_id</label> {{status.scene_id}}<br>
+              <label>title</label> {{status.scene_title}}<br>
+              <img v-if="status.image_url" v-bind:src="status.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(status.image_url, status.audio_url)"><br>
+              <audio v-if="status.audio_url" v-bind:src="status.audio_url" controls controlslist="nodownload"></audio><br>
+              <label>text</label> {{status.scene_text}}<br>
+              <label>items</label>
+              <ul>
+                <li v-for="(item, index) in status.items">{{item}}</li>
+              </ul>
+              <br>
+            </div>
+          </div>
+
+        	<div class="tab-pane" id="memories_tab">
+            <h2>回想</h2>
+            <div v-if="status">
+              <pagenation-bar v-model="memory_page_index" v-bind:count="memory_page_count"></pagenation-bar>
+              <div v-for="(item, index) in memory_list_partial">
+                <div class="row">
+                  <div class="col-xs-6">
+                    <img v-bind:src="item.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(item.image_url, item.audio_url)">
+                  </div>
+                  <div class="col-xs-6">
+                    <label>title</label> {{item.scene_title}}<br>
+                    <label>text</label> {{item.scene_text}}<br>
+                    <label>date</label> {{new Date(item.create_at).toLocaleString()}}<br>
+                    <button class="btn btn-default btn-sm pull-right" v-on:click="memory_delete(index)">削除</button>
+                  </div>
+                </div>
+                <audio v-if="item.audio_url" v-bind:src="item.audio_url" controls class="row" controlslist="nodownload"></audio>
+              </div>
+              <br>
+            </div>
+          </div>
+        </div>
+
+        <modal-dialog id="show_image_dialog" size="lg">
+          <div slot="content">
+            <div class="modal-body">
+              <img class="center-block img-responsive" v-bind:src="image_show_url"><br>
+              <audio v-bind:src="audio_show_url" controls controlslist="nodownload"></audio>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-default" v-on:click="dialog_close('#show_image_dialog')">閉じる</button>
+            </div>
+          </div>
+        </modal-dialog>
+
+        <button class="btn btn-default" v-on:click="do_close">閉じる</button>
+        <br>
+        <br>
+
+        <!-- for progress-dialog -->
+        <progress-dialog v-bind:title="progress_title"></progress-dialog>
+    </div>
+
+    <script src="js/start.js"></script>
+</body>
