@@ -2,6 +2,7 @@
 
 const IMAGE_URL_BASE = "【サーバのURL】/linebot-image/";
 const AUDIO_URL_BASE = "【音声ファイルのURL】";
+const VIDEO_URL_BASE = "【動画ファイルのURL】";
 
 const line = require('@line/bot-sdk');
 const mm = require('music-metadata');
@@ -237,7 +238,18 @@ function make_image_url(scene, status){
     });
   }
 
-  return image_url;
+  if( scene.image.video ){
+    return {
+      type: "video",
+      video_url: VIDEO_URL_BASE + scene.image.video + '.mp4',
+      image_url: image_url
+    };
+  }else{
+    return {
+      type: "image",
+      image_url: image_url
+    };
+  }
 }
 
 function get_audio_name(scene, status){
@@ -305,15 +317,23 @@ async function process_scenario(scenario, status){
     }
   };
 
-  var image_url = make_image_url(scene, status);
-  if( image_url ){
+  var image_info = make_image_url(scene, status);
+  if( image_info ){
+    if( image_info.type == 'image' ){
     flex.contents.hero = {
       type: "image",
-      url: encodeURI(image_url),
+        url: encodeURI(image_info.image_url),
       size: "full",
       aspectRatio: "20:13",
       aspectMode: "fit"
     };
+    }else if( image_info.type == 'video' ){
+      messages.push({
+        type: "video",
+        originalContentUrl: encodeURI(image_info.video_url),
+        previewImageUrl: encodeURI(image_info.image_url)
+      });
+    }
   }
 
   if( scene.title ){
@@ -633,7 +653,7 @@ app.message(async (event, client) =>{
         scene_id: status.scene,
         scene_title: scene.title,
         scene_text: scene.text,
-        image_url: make_image_url(scene, status),
+        image_info: make_image_url(scene, status),
         audio_url: audio_name ? AUDIO_URL_BASE + audio_name + '.m4a' : null,
         create_at: new Date().getTime()
       };
@@ -817,7 +837,7 @@ exports.handler = async (event, context, callback) => {
           scene_id: scene.id,
           scene_title: scene.title,
           scene_text: scene.text,
-          image_url: make_image_url(scene, status),
+          image_info: make_image_url(scene, status),
           audio_url: audio_name ? (AUDIO_URL_BASE + audio_name + '.m4a') : null,
           items: status.items,
           memories: status.memories,
