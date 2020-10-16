@@ -261,7 +261,7 @@ var vue_options = {
             }
         },
         scenario_reload: async function(scene){
-            this.scenario_reload(this.selected_scenario, scene);
+            this.scenario_load(this.selected_scenario, scene);
         },
         scenario_delete: async function(){
             if( !this.selecting_scenario )
