@@ -35,7 +35,7 @@
 </head>
 <body>
     <div id="top" class="container">
-        <h1>Gamebook : ステータス</h1>
+        <h2>Gamebook : ステータス</h2>
 
         <ul class="nav nav-tabs">
           <li class="active"><a href="#status_tab" data-toggle="tab">ステータス</a></li>
@@ -49,8 +49,15 @@
               <label>scenario_title</label> {{status.scenario_title}}<br>
               <label>scene_id</label> {{status.scene_id}}<br>
               <label>title</label> {{status.scene_title}}<br>
-              <img v-if="status.image_url" v-bind:src="status.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(status.image_url, status.audio_url)"><br>
-              <audio v-if="status.audio_url" v-bind:src="status.audio_url" controls controlslist="nodownload"></audio><br>
+              <span v-if="status.image_info.type=='image'">
+                <img v-bind:src="status.image_info.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(status.image_info, status.audio_url)">
+              </span>
+              <span v-else-if="status.image_info.type=='video'">
+                <button class="btn btn-default btn-sm" v-on:click="show_image(status.image_info, status.audio_url)">表示</button>
+                <video v-bind:src="status.image_info.video_url" class="img-responsive" controls>
+              </span>
+              <audio v-if="status.audio_url" v-bind:src="status.audio_url" controls controlslist="nodownload"></audio>
+              <br>
               <label>text</label> {{status.scene_text}}<br>
               <label>items</label>
               <ul>
@@ -67,7 +74,13 @@
               <div v-for="(item, index) in memory_list_partial">
                 <div class="row">
                   <div class="col-xs-6">
-                    <img v-bind:src="item.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(item.image_url, item.audio_url)">
+                    <span v-if="item.image_info.type=='image'">
+                      <img v-bind:src="item.image_info.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(item.image_info, item.audio_url)">
+                    </span>
+                    <span v-else-if="item.image_info.type=='video'">
+                      <button class="btn btn-default btn-sm" v-on:click="show_image(item.image_info, item.audio_url)">表示</button>
+                      <video v-bind:src="item.image_info.video_url" class="img-responsive" controls>
+                    </span>
                   </div>
                   <div class="col-xs-6">
                     <label>title</label> {{item.scene_title}}<br>
@@ -86,7 +99,12 @@
         <modal-dialog id="show_image_dialog" size="lg">
           <div slot="content">
             <div class="modal-body">
-              <img class="center-block img-responsive" v-bind:src="image_show_url"><br>
+              <span v-if="image_show_info.type=='image'">
+                <img class="center-block img-responsive" v-bind:src="image_show_info.image_url"><br>
+              </span>
+              <span v-else-if="image_show_info.type=='video'">
+                <video class="center-block img-responsive" v-bind:src="image_show_info.video_url" controls><br>
+              </span>
               <audio v-bind:src="audio_show_url" controls controlslist="nodownload"></audio>
             </div>
             <div class="modal-footer">

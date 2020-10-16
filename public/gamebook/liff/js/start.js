@@ -13,7 +13,7 @@ var vue_options = {
         progress_title: '', // for progress-dialog
 
         status: null,
-        image_show_url: null,
+        image_show_info: {},
         audio_show_url: null,
         userId: null,
         memory_page_index: 0,
@@ -30,8 +30,8 @@ var vue_options = {
         do_close: async function(){
             liff.closeWindow();
         },
-        show_image: function(image_url, audio_url){
-            this.image_show_url = image_url;
+        show_image: function(image_info, audio_url){
+            this.image_show_info = image_info;
             this.audio_show_url = audio_url;
             this.dialog_open('#show_image_dialog');
         },

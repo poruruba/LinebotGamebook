@@ -6,6 +6,7 @@ const contents_upload_url = "【サーバのURL】/linebot-upload";
 const contents_url = "【サーバのURL】/linebot-contents";
 const image_base_url = "【サーバのURL】/linebot-image/";
 const audio_base_url = "【音声ファイルのURL】";
+const video_base_url = "【動画ファイルのURL】";
 
 const NUM_OF_PAGE_IMAGES = 12;
 
@@ -24,12 +25,17 @@ var vue_options = {
         selecting_scene_index: -1,
         scene: null,
         image_url: null,
-        image_src: null,
+        image_src: {},
         image_list: [],
         image_show_name: null,
         image_show_url: null,
-        audio: null,
+        audio_src: {},
         audio_list: [],
+        video_src: {},
+        video_list: [],
+        video_show_name: null,
+        video_show_url: null,
+        video_url: null,
 
         image_page_index: 0,
         image_page_count: 0,
@@ -40,7 +46,6 @@ var vue_options = {
         }
     },
     methods: {
-        /* 画像ファイル・音声ファイルのアップロード・削除処理 : ここから */
         image_delete: async function(name){
             if( !confirm("本当に削除しますか？") )
                 return;
@@ -71,12 +76,11 @@ var vue_options = {
                 alert(error);
             }
         },
-
         image_upload: async function(){
             var param = {
                 cmd: 'upload',
                 type: 'image',
-                upfile: $('#image_file')[0].files[0]
+                upfile: this.image_src.file
             };
             if( !param.upfile )
                 return;
@@ -91,49 +95,10 @@ var vue_options = {
                 alert('アップロードに失敗しました。');
             }
         },
-
-        image_open: function(e){
-            if (e.target.files.length > 0) {
-                if( e.target.files[0].type != 'image/png' ){
-                    alert('PNGファイルではありません。');
-                    return;
-                }
-
-                this.image_open_file(e.target.files[0]);
-            }
-        },
-        image_drop: function(e){
-            e.stopPropagation();
-            e.preventDefault();
-
-            if( e.dataTransfer.files[0].type != 'image/png' ){
-                alert('PNGファイルではありません。');
-                return;
-            }
-
-            $('#image_file')[0].files = e.dataTransfer.files;
-            this.image_open_file(e.dataTransfer.files[0]);
-        },
-        image_click: function(e){
-            this.image_src = null;
-
-            e.target.value = '';
-        },
-        image_open_file: function(file){
-            var reader = new FileReader();
-            reader.onload = (theFile) =>{
-                this.image_src = reader.result;
-            };
-            reader.readAsDataURL(file);
-        },
         image_show: function(name){
             this.image_show_name = name;
             this.image_show_url = image_base_url + name;
             this.dialog_open('#show_image_dialog');
-        },
-        file_drag: function(e){
-            e.stopPropagation();
-            e.preventDefault();
         },
 
         audio_delete: async function(name){
@@ -169,7 +134,7 @@ var vue_options = {
             var param = {
                 cmd: 'upload',
                 type: 'audio',
-                upfile: $('#audio_file')[0].files[0]
+                upfile: this.audio_src.file
             };
             if( !param.upfile )
                 return;
@@ -184,49 +149,64 @@ var vue_options = {
                 alert('アップロードに失敗しました。');
             }
         },
-        audio_open: function(e){
-            if (e.target.files.length > 0) {
-                if( e.target.files[0].type != 'audio/x-m4a' ){
-                    alert('M4Aファイルではありません。');
-                    return;
-                }
-
-                this.audio_open_file(e.target.files[0]);
-            }
-        },
-        audio_open_file: function(file){
-            var reader = new FileReader();
-            reader.onload = (theFile) =>{
-                this.audio = new Audio(reader.result);
-            };
-            reader.readAsDataURL(file);
-        },
         audio_play: function(name){
-            if( !name ){
-                this.audio.play();
-            }else{
-                var audio = new Audio(audio_base_url + name + '.m4a');
-                audio.play();
+            var audio = new Audio(audio_base_url + name + '.m4a');
+            audio.play();
+        },
+
+        video_delete: async function(name){
+            if( !confirm("本当に削除しますか？") )
+                    return;
+
+            var body = {
+                cmd: 'delete',
+                type: 'video',
+                name: name
+            };
+            try{
+                await do_post(contents_url, body);
+                await this.video_list_reload();
+            }catch(error){
+                console.log(error);
+                alert(error);
             }
         },
-        audio_drop: function(e){
-            e.stopPropagation();
-            e.preventDefault();
-
-            if( e.dataTransfer.files[0].type != 'audio/x-m4a' ){
-                alert('M4Aファイルではありません。');
+        video_list_reload: async function(){
+            var body = {
+                cmd: 'list',
+                type: 'video'
+            };
+            try{
+                this.video_list = await do_post(contents_url, body);
+            }catch(error){
+                console.log(error);
+                alert(error);
+            }
+        },
+        video_upload: async function(){
+            var param = {
+                cmd: 'upload',
+                type: 'video',
+                upfile: this.video_src.file
+            };
+            if( !param.upfile )
                 return;
+
+            try{
+                await do_post_formdata(contents_upload_url, param);
+                alert('アップロードしました。');
+                this.dialog_close('#upload_video_dialog');
+                await this.video_list_reload();
+            }catch(error){
+                console.log(error);
+                alert('アップロードに失敗しました。');
             }
-
-            $('#audio_file')[0].files = e.dataTransfer.files;
-            this.audio_open_file(e.dataTransfer.files[0]);
         },
-        audio_click: function(e){
-            this.audio = null;
-
-            e.target.value = '';
+        video_show: function(name){
+            this.video_show_name = name;
+            this.video_show_url = video_base_url + name + '.mp4';
+            this.dialog_open('#show_video_dialog');
         },
-        /* 画像ファイル・音声ファイルのアップロード・削除処理 : ここまで */
 
         scenario_list_reload: async function(){
             var param = {
@@ -260,8 +240,8 @@ var vue_options = {
                 this.scene = null;
             }
         },
-        scenario_reload: async function(scene){
-            this.scenario_load(this.selected_scenario, scene);
+        scenario_reload: async function(){
+            this.scenario_load(this.selected_scenario);
         },
         scenario_delete: async function(){
             if( !this.selecting_scenario )
@@ -398,6 +378,7 @@ var vue_options = {
         scene_change: async function(){
             this.scene = this.scenario.scene[this.selecting_scene_index];
             this.update_image_url();
+            this.update_video_url();
         },
 
         selection_add: function(){
@@ -454,6 +435,12 @@ var vue_options = {
             }
             this.image_url = url;
         },
+        update_video_url: function(){
+            if(!this.scene || !this.scene.image.video)
+                this.video_url = "";
+            else
+                this.video_url = video_base_url + this.scene.image.video + '.mp4';
+        },
     },
     created: function(){
     },
@@ -463,6 +450,7 @@ var vue_options = {
         this.scenario_list_reload();
         this.image_list_reload();
         this.audio_list_reload();
+        this.video_list_reload();
     }
 };
 vue_add_methods(vue_options, methods_bootstrap);

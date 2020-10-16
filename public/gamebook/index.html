@@ -34,12 +34,13 @@
 </head>
 <body>
     <div id="top" class="container">
-        <h1>Gamebook：シナリオエディタ</h1>
+        <h2>Gamebook：シナリオエディタ</h2>
         <br>
 
         <ul class="nav nav-tabs">
           <li class="active"><a href="#scenario_tab" data-toggle="tab">シナリオ編集</a></li>
           <li><a href="#images_tab" data-toggle="tab">画像リスト</a></li>
+          <li><a href="#video_tab" data-toggle="tab">動画リスト</a></li>
           <li><a href="#audio_tab" data-toggle="tab">音声リスト</a></li>
         </ul>
 
@@ -62,6 +63,7 @@
             <br>
             <pagenation-bar v-model="image_page_index" v-bind:count="image_page_count"></pagenation-bar>
             <br>
+            <div class="row">
             <div class="col-xs-4" v-for="(value, index) in image_list_partial">
               <div class="panel panel-default">
                 <div class="panel-heading">{{value}} <button class="btn btn-default btn-xs pull-right" v-on:click="image_delete(value)">削除</button>
@@ -71,7 +73,17 @@
                 </div>
               </div>
             </div>
+            </div>
+          </div>
+
+          <div class="tab-pane" id="video_tab">
             <br>
+            <button class="btn btn-default" v-on:click="dialog_open('#upload_video_dialog')">アップロード</button>
+            <button class="btn btn-default" v-on:click="video_list_reload()">リロード</button>
+            <br><br>
+            <ul>
+              <li v-for="(value, index) in video_list"><button class="btn btn-default" v-on:click="video_show(value)">表示</button><button class="btn btn-default" v-on:click="video_delete(value)">削除</button> {{value}}</li>
+            </ul>
           </div>
 
         	<div class="tab-pane active" id="scenario_tab">
@@ -102,7 +114,6 @@
                 <button class="btn btn-default" v-on:click="scene_add()">新規作成</button>
                 <button class="btn btn-default" v-on:click="scene_remove()">削除</button>
               </div>
-              <br>
 
               <div v-if="scene">
                 <div class="form-inline">
@@ -111,7 +122,8 @@
                 <label>text</label> <textarea type="text" class="form-control" rows="3" v-model="scene.text"></textarea>
                 <br>
                 <div class="form-inline">
-                  <label>image.background</label> <input type="text" class="form-control" v-model="scene.image.background" /> <button class="btn btn-default" v-on:click="update_image_url">再描画</button>
+                  <label>image.background</label> <input type="text" class="form-control" v-model="scene.image.background" /> <button class="btn btn-default" v-on:click="update_image_url">再描画</button><br>
+                  <label>image.video</label> <input type="text" class="form-control" v-model="scene.image.video" /><button class="btn btn-default" v-on:click="update_video_url">再描画</button><br>
                 </div>
                 <label>image.composite</label>
                 <ul>
@@ -125,7 +137,10 @@
                   </li>
                   <li><button class="btn btn-default" v-on:click="composite_add()">追加</button></li>
                 </ul>
-                <img v-if="scene.image.background" v-bind:src="image_url"> 
+                <div class="row">
+                  <img v-if="image_url" v-bind:src="image_url" class="col-md-5">
+                  <video v-if="video_url" v-bind:src="video_url" class="col-md-5" controls>
+                </div>
 
                 <br><br>
                 <label>selection</label>
@@ -162,8 +177,8 @@
 
               </div>
             </div>
-            <br>
           </div>
+          <br><br>
         </div>
 
         <modal-dialog id="upload_dialog">
@@ -172,9 +187,8 @@
               <h4>画像ファイルアップロード</h4>
             </div>
             <div class="modal-body">
-              <input type="file" id="image_file" accept="image/png" v-on:change="image_open" v-on:click="image_click">
-              <img v-if="!image_src" class="center-block" src="img/image_drop.png" v-on:drop="image_drop" v-on:dragover="file_drag">
-              <img v-if="image_src" class="center-block img-responsive" v-bind:src="image_src" v-on:drop="image_drop" v-on:dragover="file_drag">
+              <file-selector id="image_file" drag_image_src="img/image_drop.png" accept="image/png" v-model="image_src"></file-selector>
+              <img v-if="image_src.data" class="center-block img-responsive" v-bind:src="image_src.data">
             </div>
             <div class="modal-footer">
               <button class="btn btn-default" v-on:click="image_upload">アップロード</button>
@@ -189,13 +203,28 @@
               <h4>音声ファイルアップロード</h4>
             </div>
             <div class="modal-body">
-              <input type="file" id="audio_file" accept="audio/aac" v-on:change="audio_open" v-on:click="audio_click">
-              <img class="center-block" src="img/image_drop.png" v-on:drop="audio_drop" v-on:dragover="file_drag">
-              <button v-if="audio" class="btn btn-default" v-on:click="audio_play()">再生</button>
+              <file-selector id="audio_file" drag_image_src="img/image_drop.png" accept="audio/x-m4a" v-model="audio_src"></file-selector>
+              <audio v-if="audio_src.data" v-bind:src="audio_src.data" controls></audio>
             </div>
             <div class="modal-footer">
               <button class="btn btn-default" v-on:click="audio_upload">アップロード</button>
               <button class="btn btn-default" v-on:click="dialog_close('#upload_audio_dialog')">キャンセル</button>
+            </div>
+          </div>
+        </modal-dialog>
+
+        <modal-dialog id="upload_video_dialog">
+          <div slot="content">
+            <div class="modal-header">
+              <h4>動画ファイルアップロード</h4>
+            </div>
+            <div class="modal-body">
+              <file-selector id="video_file" drag_image_src="img/image_drop.png" accept="video/mp4" v-model="video_src"></file-selector>
+              <video v-if="video_src.data" class="img-responsive" v-bind:src="video_src.data" controls></video>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-default" v-on:click="video_upload">アップロード</button>
+              <button class="btn btn-default" v-on:click="dialog_close('#upload_video_dialog')">キャンセル</button>
             </div>
           </div>
         </modal-dialog>
@@ -214,6 +243,21 @@
           </div>
         </modal-dialog>
 
+        <modal-dialog id="show_video_dialog" size="lg">
+          <div slot="content">
+            <div class="modal-header">
+              <h4>{{video_show_name}}</h4>
+            </div>
+            <div class="modal-body">
+              <video class="center-block img-responsive" v-bind:src="video_show_url" controls>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-default" v-on:click="dialog_close('#show_video_dialog')">閉じる</button>
+            </div>
+          </div>
+        </modal-dialog>
+        
+        
         <!-- for progress-dialog -->
         <progress-dialog v-bind:title="progress_title"></progress-dialog>
     </div>
