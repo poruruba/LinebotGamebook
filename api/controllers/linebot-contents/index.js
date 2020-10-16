@@ -13,6 +13,7 @@ const CONTENTS_BUCKET = process.env.CONTENTS_BUCKET || 'gamebook';
 const SCENARIO_OBJECT_BASE = 'scenario/'
 const IMAGE_OBJECT_BASE = 'images/'
 const AUDIO_OBJECT_BASE = 'audio/'
+const VIDEO_OBJECT_BASE = 'video/'
 
 var AWS = require('aws-sdk');
 AWS.config.update({
@@ -24,6 +25,7 @@ var s3  = new AWS.S3({
 // ファイル用
 const IMAGE_FILE_BASE = './public/gamebook/images/';
 const AUDIO_FILE_BASE = './public/gamebook/audio/';
+const VIDEO_FILE_BASE = './public/gamebook/video/';
 const SCENARIO_FILE_BASE = './data/gamebook/scenario/';
 const fs = require('fs').promises;
 
@@ -49,6 +51,7 @@ async function update_object(type, fname, body){
     var key;
     if( type == 'image' ) key = IMAGE_OBJECT_BASE;
     else if( type == 'audio' ) key = AUDIO_OBJECT_BASE;
+    else if( type == 'video' ) key = VIDEO_OBJECT_BASE;
     else if( type == 'scenario' ) key = SCENARIO_OBJECT_BASE;
 
     var param_put = {
@@ -64,6 +67,7 @@ async function update_object(type, fname, body){
     var base;
     if( type == 'image' ) base = IMAGE_FILE_BASE;
     else if( type == 'audio' ) base = AUDIO_FILE_BASE;
+    else if( type == 'video' ) base = VIDEO_FILE_BASE;
     else if( type == 'scenario' ) base = SCENARIO_FILE_BASE;
 
     await fs.writeFile(base + fname, body);
@@ -76,6 +80,7 @@ async function delete_file(type, fname){
     var key;
     if( type == 'image' ) key = IMAGE_OBJECT_BASE;
     else if( type == 'audio' ) key = AUDIO_OBJECT_BASE;
+    else if( type == 'video' ) key = VIDEO_OBJECT_BASE;
     else if( type == 'scenario' ) key = SCENARIO_OBJECT_BASE;
     var param_delete = {
       Bucket: CONTENTS_BUCKET,
@@ -93,6 +98,7 @@ async function delete_file(type, fname){
     var base;
     if( type == 'image' ) base = IMAGE_FILE_BASE;
     else if( type == 'audio' ) base = AUDIO_FILE_BASE;
+    else if( type == 'video' ) base = VIDEO_FILE_BASE;
     else if( type == 'scenario' ) base = SCENARIO_FILE_BASE;
 
     await fs.unlink(base + fname);
@@ -105,6 +111,7 @@ async function list_files(type){
     var key;
     if( type == 'image' ) key = IMAGE_OBJECT_BASE;
     else if( type == 'audio' ) key = AUDIO_OBJECT_BASE;
+    else if( type == 'video' ) key = VIDEO_OBJECT_BASE;
     else if( type == 'scenario' ) key = SCENARIO_OBJECT_BASE;
 
     var param_list = {
@@ -123,6 +130,7 @@ async function list_files(type){
     var base;
     if( type == 'image' ) base = IMAGE_FILE_BASE;
     else if( type == 'audio' ) base = AUDIO_FILE_BASE;
+    else if( type == 'video' ) base = VIDEO_FILE_BASE;
     else if( type == 'scenario' ) base = SCENARIO_FILE_BASE;
 
     var files = await fs.readdir(base);
@@ -145,6 +153,7 @@ exports.handler = async (event, context, callback) => {
       var ext;
       if( body.type == 'image') ext = '.png';
       else if( body.type == 'audio') ext = '.m4a';
+      else if( body.type == 'video') ext = '.mp4';
       else return new Response().set_error('unknown type');
 
       var fname = event.files.upfile[0].originalname;
@@ -159,7 +168,7 @@ exports.handler = async (event, context, callback) => {
       var body = JSON.parse(event.body);
       if( body.cmd == 'list' ){
         var list = await list_files(body.type);
-        if( body.type == 'image' || body.type == 'audio'){
+        if( body.type == 'image' || body.type == 'audio' || body.type == 'video'){
           for( var i = 0 ; i < list.length ; i++ )
             list[i] = list[i].slice(0, -4);
         }
@@ -169,6 +178,7 @@ exports.handler = async (event, context, callback) => {
         var fname;
         if( body.type == 'image') fname = body.name + '.png';
         else if( body.type == 'audio') fname = body.name + '.m4a';
+        else if( body.type == 'video') fname = body.name + '.mp4';
         else fname = body.fname;
         await delete_file(body.type, fname);
         return new Response({ result: 'OK'});
