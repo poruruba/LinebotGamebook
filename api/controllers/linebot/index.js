@@ -414,7 +414,7 @@ async function process_scenario(scenario, status){
   if( audio_name ){
     // 音声ファイルが指定されていた場合
     var audio_buffer = await load_audio(audio_name + '.m4a');
-    var metadata = await mm.parseBuffer(audio_buffer, "audio/aac")
+    var metadata = await mm.parseBuffer(audio_buffer, "audio/aac", { duration: true });
     var message = {
       type: "audio",
       originalContentUrl: encodeURI(AUDIO_URL_BASE + audio_name + '.m4a'),
