@@ -27,6 +27,40 @@ var vue_options = {
         }
     },
     methods: {
+        do_reload: function(){
+            liff.sendMessages([{type: 'text', text: 'リロード'}])
+            .then(() =>{
+                console.log('success');
+                liff.closeWindow();
+            })
+            .catch(err =>{
+                console.error(err);
+            });
+        },
+        do_retire: function(){
+            if( !confirm('本当にリタイアしますか？') )
+                return;
+            liff.sendMessages([{type: 'text', text: 'リタイア'}])
+            .then(() =>{
+                console.log('success');
+                liff.closeWindow();
+            })
+            .catch(err =>{
+                console.error(err);
+            });
+        },
+        do_reset: function(){
+            if( !confirm('本当にリセットしますか？') )
+                return;
+            liff.sendMessages([{type: 'text', text: 'リセット'}])
+            .then(() =>{
+                console.log('success');
+                liff.closeWindow();
+            })
+            .catch(err =>{
+                console.error(err);
+            });
+        },
         do_close: async function(){
             liff.closeWindow();
         },
