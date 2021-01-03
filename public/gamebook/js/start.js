@@ -427,8 +427,10 @@ var vue_options = {
         },
         
         update_image_url: function(){
-            if(!this.scene || !this.scene.image.background)
+            if(!this.scene || !this.scene.image.background){
                 this.image_url = "";
+                return;
+            }
             var url = image_base_url + this.scene.image.background;
             for( var i = 0 ; i < this.scene.image.composite.length ; i++ ){
                 url += '-' + this.scene.image.composite[i].name + '_' + this.scene.image.composite[i].position;
