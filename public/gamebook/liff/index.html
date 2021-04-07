@@ -49,12 +49,14 @@
               <label>scenario_title</label> {{status.scenario_title}}<br>
               <label>scene_id</label> {{status.scene_id}}<br>
               <label>title</label> {{status.scene_title}}<br>
-              <span v-if="status.image_info.type=='image'">
-                <img v-bind:src="status.image_info.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(status.image_info, status.audio_url)">
-              </span>
-              <span v-else-if="status.image_info.type=='video'">
-                <button class="btn btn-default btn-sm" v-on:click="show_image(status.image_info, status.audio_url)">表示</button>
-                <video v-bind:src="status.image_info.video_url" class="img-responsive" controls>
+              <span v-if="status.image_info">
+                <span v-if="status.image_info.type=='image'">
+                  <img v-bind:src="status.image_info.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(status.image_info, status.audio_url)">
+                </span>
+                <span v-else-if="status.image_info.type=='video'">
+                  <button class="btn btn-default btn-sm" v-on:click="show_image(status.image_info, status.audio_url)">表示</button>
+                  <video v-bind:src="status.image_info.video_url" class="img-responsive" controls>
+                </span>
               </span>
               <audio v-if="status.audio_url" v-bind:src="status.audio_url" controls controlslist="nodownload"></audio>
               <br>
@@ -74,12 +76,14 @@
               <div v-for="(item, index) in memory_list_partial">
                 <div class="row">
                   <div class="col-xs-6">
-                    <span v-if="item.image_info.type=='image'">
-                      <img v-bind:src="item.image_info.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(item.image_info, item.audio_url)">
-                    </span>
-                    <span v-else-if="item.image_info.type=='video'">
-                      <button class="btn btn-default btn-sm" v-on:click="show_image(item.image_info, item.audio_url)">表示</button>
-                      <video v-bind:src="item.image_info.video_url" class="img-responsive" controls>
+                    <span v-if="item.image_info">
+                      <span v-if="item.image_info.type=='image'">
+                        <img v-bind:src="item.image_info.image_url" class="img-responsive img-thumbnail" v-on:click="show_image(item.image_info, item.audio_url)">
+                      </span>
+                      <span v-else-if="item.image_info.type=='video'">
+                        <button class="btn btn-default btn-sm" v-on:click="show_image(item.image_info, item.audio_url)">表示</button>
+                        <video v-bind:src="item.image_info.video_url" class="img-responsive" controls>
+                      </span>
                     </span>
                   </div>
                   <div class="col-xs-6">
